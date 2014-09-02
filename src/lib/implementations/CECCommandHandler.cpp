@@ -538,6 +538,11 @@ int CCECCommandHandler::HandleRoutingInformation(const cec_command &command)
 
 int CCECCommandHandler::HandleSetMenuLanguage(const cec_command &command)
 {
+  if (command.initiator == CECDEVICE_TV && command.destination == CECDEVICE_BROADCAST)
+  {
+    m_processor->GetDevice(command.initiator)->SetPowerStatus(CEC_POWER_STATUS_ON);
+  }
+
   if (command.parameters.size == 3)
   {
     CCECBusDevice *device = GetDevice(command.initiator);
@@ -592,12 +597,15 @@ int CCECCommandHandler::HandleSetStreamPath(const cec_command &command)
     CCECBusDevice *device = GetDeviceByPhysicalAddress(iStreamAddress);
     if (device)
     {
-      if (device->IsHandledByLibCEC() && !device->IsActiveSource())
-        device->ActivateSource();
-      else
+      if (device->IsHandledByLibCEC())
       {
-        device->MarkAsActiveSource();
-        device->TransmitActiveSource(true);
+        if (!device->IsActiveSource())
+          device->ActivateSource();
+        else
+        {
+          device->MarkAsActiveSource();
+          device->TransmitActiveSource(true);
+        }
       }
       return COMMAND_HANDLED;
     }
