@@ -37,18 +37,17 @@ namespace CEC
 {
   using namespace PLATFORM;
   
-  class CAdapterMessageQueueEntry
+  class CIMXCECAdapterMessageQueueEntry
   {
   public:
-    CAdapterMessageQueueEntry(const cec_command &command)
+    CIMXCECAdapterMessageQueueEntry(uint8_t addrs, cec_opcode opcode)
        : m_bWaiting(true), m_retval((uint32_t)-1), m_bSucceeded(false)
     {
-      m_hash = hashValue(
-    	uint32_t(command.opcode_set ? command.opcode : CEC_OPCODE_NONE),
-        command.initiator, command.destination);
+      m_opcode = opcode;
+      m_addrs = addrs; 
     }
     
-    virtual ~CAdapterMessageQueueEntry(void) {}
+    virtual ~CIMXCECAdapterMessageQueueEntry(void) {}
 
     /*!
      * @brief Query result from worker thread
@@ -70,22 +69,17 @@ namespace CEC
     /*!
      * @brief Signal waiting thread(s) when message matches this entry
      */
-    bool CheckMatch(uint32_t opcode, cec_logical_address initiator, 
-                    cec_logical_address destination, uint32_t response)
+    bool Received(int response, uint8_t addrs, cec_opcode opcode)
     {
-      uint32_t hash = hashValue(opcode, initiator, destination);
-      
-      if (hash == m_hash)
-      {
-        CLockObject lock(m_mutex);
+      CLockObject lock(m_mutex);
 
-        m_retval = response;
-        m_bSucceeded = true;
-        m_condition.Signal();
-        return true;
-      }
-      
-      return false;
+      if (!(m_addrs == addrs && m_opcode == opcode))
+        return false;
+
+      m_retval = response;
+      m_bSucceeded = true;
+      m_condition.Signal();
+      return true;
     }
 
     /*!
@@ -111,24 +105,14 @@ namespace CEC
       return m_bWaiting;
     }
 
-    /*!
-     * @return Hash value for given cec_command
-     */
-    static uint32_t hashValue(uint32_t opcode, 
-                              cec_logical_address initiator,  
-                              cec_logical_address destination)
-    {
-      return 1 | ((uint32_t)initiator << 8) | 
-             ((uint32_t)destination << 16) | ((uint32_t)opcode << 16);
-    }
-    
   private:    
     bool                         m_bWaiting;     /**< true while a thread is waiting or when it hasn't started waiting yet */
     PLATFORM::CCondition<bool>   m_condition;    /**< the condition to wait on */
     PLATFORM::CMutex             m_mutex;        /**< mutex for changes to this class */
-    uint32_t                  	 m_hash;
-    uint32_t                     m_retval;
+    int                          m_retval;
     bool                         m_bSucceeded;
+    uint8_t                      m_addrs;
+    cec_opcode                   m_opcode;
   };
  
 };
