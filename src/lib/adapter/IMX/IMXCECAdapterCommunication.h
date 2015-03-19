@@ -40,9 +40,9 @@
 #define IMX_ADAPTER_PID 0x1001
 
 typedef struct hdmi_cec_event{
-  int event_type;
-  int msg_len;
-  unsigned char msg[MAX_MESSAGE_LEN];
+  uint8_t event_type;
+  uint8_t msg_len;
+  uint8_t msg[MAX_MESSAGE_LEN];
 }hdmi_cec_event;
 
 
