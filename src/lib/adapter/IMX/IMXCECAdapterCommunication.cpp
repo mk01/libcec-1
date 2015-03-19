@@ -35,6 +35,7 @@
 #include "lib/LibCEC.h"
 #include "lib/platform/sockets/cdevsocket.h"
 #include "lib/platform/util/StdString.h"
+#include "platform/util/util.h"
 
 using namespace std;
 using namespace CEC;
@@ -55,7 +56,8 @@ using namespace PLATFORM;
 #define CEC_MSG_FAIL_DATA_NOT_ACK       0x86	/*Message transmisson failed: Databyte not acknowledged*/
 
 CIMXCECAdapterCommunication::CIMXCECAdapterCommunication(IAdapterCommunicationCallback *callback) :
-    IAdapterCommunication(callback)
+    IAdapterCommunication(callback),
+    m_PAReporter(NULL)
 {
   CLockObject lock(m_mutex);
 
@@ -64,13 +66,13 @@ CIMXCECAdapterCommunication::CIMXCECAdapterCommunication(IAdapterCommunicationCa
   m_bLogicalAddressRegistered = false;
   m_bInitialised = false;
   m_dev = new CCDevSocket(CEC_IMX_PATH);
+  m_physicalAddress = -1;
 }
 
 CIMXCECAdapterCommunication::~CIMXCECAdapterCommunication(void)
 {
   Close();
-
-  CLockObject lock(m_mutex);
+  DELETE_AND_NULL(m_PAReporter);
   delete m_dev;
   m_dev = 0;
 }
@@ -342,23 +344,41 @@ void *CIMXCECAdapterCommunication::Process(void)
         {
             /* HDMI Hotplug event - disconnect */
         }
-        else if (event.event_type == MESSAGE_TYPE_CONNECTED)
+        else if (event.event_type == MESSAGE_TYPE_CONNECTED && m_physicalAddress != 0xffff)
         {
             /* HDMI Hotplug event - connect */
             uint16_t oldAddress = m_physicalAddress;
 
-            if (oldAddress != GetPhysicalAddress())
-              m_callback->HandlePhysicalAddressChanged(m_physicalAddress);
+            if (oldAddress != GetPhysicalAddress()) {
+              if (m_PAReporter)
+                while (m_PAReporter->IsRunning()) Sleep(5);
+              delete m_PAReporter;
+
+              m_PAReporter = new CCECPAChangedReporter(m_callback, m_physicalAddress);
+              m_PAReporter->CreateThread();
+            }
 #ifdef CEC_DEBUGGING
             LIB_CEC->AddLog(CEC_LOG_DEBUG, "%s: plugin event received", __func__);
 #endif
         }
         else
             LIB_CEC->AddLog(CEC_LOG_WARNING, "%s: unhandled response received %d!", __func__, event.event_type);
-    }       
+    }
   }
 
   return 0;
+}
+
+CCECPAChangedReporter::CCECPAChangedReporter(IAdapterCommunicationCallback *callback, uint16_t newPA) :
+    m_callback(callback),
+    m_newPA(newPA)
+{
+}
+
+void* CCECPAChangedReporter::Process(void)
+{
+  m_callback->HandlePhysicalAddressChanged(m_newPA);
+  return NULL;
 }
 
 #endif	// HAVE_IMX_API

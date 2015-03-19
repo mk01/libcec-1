@@ -55,6 +55,17 @@ namespace CEC
 {
   class CIMXCECAdapterMessageQueueEntry;
 
+  class CCECPAChangedReporter : public PLATFORM::CThread
+  {
+  public:
+    CCECPAChangedReporter(IAdapterCommunicationCallback *callback, uint16_t newPA);
+    void* Process(void);
+
+  private:
+    IAdapterCommunicationCallback *m_callback;
+    uint16_t                       m_newPA;
+  };
+
   class CIMXCECAdapterCommunication : public IAdapterCommunication, public PLATFORM::CThread
   {
   public:
@@ -119,6 +130,8 @@ namespace CEC
 
     bool                        m_bLogicalAddressRegistered;
     bool                        m_bInitialised;
+
+    CCECPAChangedReporter       *m_PAReporter;
   };
   
 };
