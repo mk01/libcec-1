@@ -113,8 +113,7 @@ namespace PLATFORM
 
   inline ssize_t SocketRead(socket_t socket, int *iError, void* data, size_t len, uint64_t iTimeoutMs /*= 0*/)
   {
-    fd_set port;
-    struct timeval timeout, *tv;
+    struct pollfd fds;
     int64_t iNow(0), iTarget(0);
     ssize_t iBytesRead(0);
     *iError = 0;
@@ -133,27 +132,16 @@ namespace PLATFORM
 
     while (iBytesRead >= 0 && iBytesRead < (ssize_t)len && (iTimeoutMs == 0 || iTarget > iNow))
     {
-      if (iTimeoutMs == 0)
-      {
-        tv = NULL;
-      }
-      else
-      {
-        timeout.tv_sec  = ((long int)iTarget - (long int)iNow) / (long int)1000.;
-        timeout.tv_usec = ((long int)iTarget - (long int)iNow) % (long int)1000.;
-        tv = &timeout;
-      }
-
-      FD_ZERO(&port);
-      FD_SET(socket, &port);
-      ssize_t returnv = (ssize_t)select(socket + 1, &port, NULL, NULL, tv);
+      fds.fd = (int)socket;
+      fds.events = POLLIN | POLLHUP;
+      ssize_t returnv = (ssize_t)poll(&fds, 1, iTimeoutMs ? iTimeoutMs : -1);
 
       if (returnv == -1)
       {
         *iError = errno;
         return -errno;
       }
-      else if (returnv == 0)
+      else if (returnv == 0 || fds.revents & POLLHUP)
       {
         break; //nothing to read
       }

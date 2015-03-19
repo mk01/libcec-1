@@ -303,7 +303,7 @@ void *CIMXCECAdapterCommunication::Process(void)
 
   while (!IsStopped())
   {
-    if (IsInitialised() && (ret = m_dev->Read((char *)&event, sizeof(event), 5000)) > 0)
+    if (IsInitialised() && (ret = m_dev->Read((char *)&event, sizeof(event), 0)) > 0)
     {
 
       initiator = cec_logical_address(event.msg[0] >> 4);
